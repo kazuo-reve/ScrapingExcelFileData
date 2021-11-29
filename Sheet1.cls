@@ -13,7 +13,6 @@ Attribute VB_Exposed = True
 Const SEARCH_FOLDER As String = "C:\Users\kazuo\OneDrive\ドキュメント\Excelマクロ\test\"
 Const FILE_SEARCH_PATTERN As String = "*_test.xlsx"
 
-
 ' データ収集時の検索のキーとなる情報を格納するための構造体
 Private Type ScrapingKey
     sheetName As String
@@ -25,6 +24,36 @@ End Type
 
 ' 処理本体
 ' Excelファイル内の表構成やデータ収集の処理方法を変える場合、修正が必要
+
+Public Sub CreateSerchFileList()
+    
+    Dim thisWS As Worksheet
+    Set thisWS = ThisWorkbook.ActiveSheet
+    
+    Dim row As Long
+    
+    Dim files: files = GetFilesForAllDirectories(SEARCH_FOLDER, FILE_SEARCH_PATTERN)
+    Dim file
+          
+    
+    ' データ収集結果の出力処理
+    Application.ScreenUpdating = False
+    Dim beforeCalculation As XlCalculation
+    beforeCalculation = Application.Calculation
+    Application.Calculation = xlCalculationManual
+    
+    row = 3
+    For Each file In files
+        thisWS.Cells(row, 1) = file.Path
+        thisWS.Cells(row, 2) = file.DateLastModified
+        row = row + 1
+    Next
+    
+    Application.ScreenUpdating = True
+    Application.Calculation = beforeCalculation
+    
+End Sub
+
 Public Sub ScrapingExcelFileData()
     
     Dim thisWS As Worksheet
@@ -35,9 +64,7 @@ Public Sub ScrapingExcelFileData()
     Dim col As Long
     Dim i As Long
     
-    Dim files: files = GetFilesForAllDirectories(SEARCH_FOLDER, FILE_SEARCH_PATTERN)
-    Dim file
-    
+   
     ' データ収集時の検索のキーとなる情報を配列に格納
     ' キーとなる情報は、"SheetName:CellTitle:OffsetX:OffsetY"で表現されている前提の処理
     Dim scrapingKeys() As ScrapingKey
@@ -65,9 +92,7 @@ Public Sub ScrapingExcelFileData()
     Application.Calculation = xlCalculationManual
     
     row = 3
-    For Each file In files
-        thisWS.Cells(row, 1) = file.Path
-        thisWS.Cells(row, 2) = file.DateLastModified
+    Do While (thisWS.Cells(row, 1) <> "")
         
         Set targetWB = Workbooks.Open(thisWS.Cells(row, 1), ReadOnly:=True)
             
@@ -79,7 +104,7 @@ Public Sub ScrapingExcelFileData()
         targetWB.Close
             
         row = row + 1
-    Next
+    Loop
     
     Application.ScreenUpdating = True
     Application.Calculation = beforeCalculation
@@ -113,18 +138,20 @@ Public Function GetFilesForAllDirectories(currentFolder As String, fileNamePatte
     Dim filedic As Object
     Set filedic = CreateObject("scripting.dictionary")
     
-    Call GetFilePath(currentFolder, fileNamePattern, filedic)
+    Dim fso As Object
+    Set fso = CreateObject("scripting.Filesystemobject")
+    
+    Call GetFilePath(currentFolder, fileNamePattern, filedic, fso)
     GetFilesForAllDirectories = filedic.Keys
 
 End Function
 
-Private Sub GetFilePath(folderPath As String, fileNamePattern As String, ByRef filedic As Object)
+Private Sub GetFilePath(folderPath As String, fileNamePattern As String, ByRef filedic As Object, ByRef fso As Object)
 
-    Dim fso As Object: Set fso = CreateObject("scripting.Filesystemobject")
     Dim subfolder As Object
 
     For Each subfolder In fso.GetFolder(folderPath).SubFolders
-        Call GetFilePath(subfolder.Path, fileNamePattern, filedic)
+        Call GetFilePath(subfolder.Path, fileNamePattern, filedic, fso)
     Next
 
     Dim file 'as Fileとしたいですが for eachで帰ってくる要素はVariant限定なのでas Fileはデバッグ以外で使用できません
